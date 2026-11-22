@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подготовка фото A4 и метки для AR</title>
+<style>
+  :root { --accent:#5b5ff0; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:#f5f6fb; color:#1b1d29; padding:0 0 70px;
+    font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  }
+  header { background:linear-gradient(135deg,#5b5ff0,#8a5cf6); color:#fff; padding:38px 20px 34px; text-align:center; }
+  header h1 { margin:0 0 6px; font-size:27px; }
+  header p  { margin:0; opacity:.92; }
+  main { max-width:860px; margin:0 auto; padding:0 20px; }
+  .card { background:#fff; border-radius:16px; padding:22px 24px; margin:-24px 0 20px; box-shadow:0 8px 30px rgba(30,30,80,.08); }
+  h2 { font-size:15px; letter-spacing:.04em; text-transform:uppercase; color:#7a7fa6; margin:30px 0 12px; }
+  .drop {
+    border:2px dashed #c3c8e8; border-radius:16px; background:#fbfbff; text-align:center;
+    padding:38px 20px; cursor:pointer; transition:.15s;
+  }
+  .drop:hover, .drop.over { border-color:var(--accent); background:#f0f1ff; }
+  .drop .big { font-size:38px; }
+  .row { display:flex; flex-wrap:wrap; gap:22px; align-items:flex-start; }
+  .preview { flex:0 0 240px; }
+  .sheet {
+    width:240px; aspect-ratio:210/297; background:#fff repeat center/cover;
+    border:1px solid #d7dbf0; border-radius:6px; box-shadow:0 6px 18px rgba(30,30,80,.12);
+  }
+  .sheet.land { aspect-ratio:297/210; width:300px; }
+  .opts { flex:1 1 300px; min-width:260px; }
+  label.opt { display:block; margin:6px 0; }
+  select, button { font:inherit; }
+  select { padding:9px 12px; border-radius:10px; border:1px solid #d3d7ee; background:#fff; }
+  button {
+    border:0; border-radius:12px; padding:13px 20px; font-weight:600; cursor:pointer;
+    background:var(--accent); color:#fff; margin:6px 8px 6px 0;
+  }
+  button.ghost { background:#eceefb; color:#3a3f74; }
+  button[disabled] { opacity:.45; cursor:default; }
+  .callout { border-radius:12px; padding:13px 16px 13px 44px; position:relative; margin:14px 0; font-size:16px; }
+  .callout::before { position:absolute; left:15px; top:12px; font-size:19px; }
+  .tip  { background:#eef1ff; border:1px solid #cdd4f7; } .tip::before  { content:"💡"; }
+  .warn { background:#fff6e9; border:1px solid #f2d9a8; } .warn::before { content:"⚠️"; }
+  .ok   { background:#e9f7f0; border:1px solid #b6e3cd; } .ok::before   { content:"✅"; }
+  .bar { height:10px; border-radius:99px; background:#e6e8f6; overflow:hidden; margin:10px 0; display:none; }
+  .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
+  code.file { background:#111428; color:#8affc1; border-radius:6px; padding:2px 8px; font-family:Consolas,monospace; font-size:15px; }
+  ol li { margin:6px 0; }
+  .muted { color:#6d719a; font-size:15px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🖨️ Фото A4 + метка для AR</h1>
+  <p>Готовим лист для печати и файл распознавания <code>targets.mind</code></p>
+</header>
+
+<main>
+  <div class="card">
+    <p style="margin-top:0"><b>Зачем это.</b> Карточка узнаёт вашу фотографию через камеру и
+      накладывает на неё видео. Чтобы узнавание было быстрым, фотографию печатают на листе
+      <b>A4</b>, а страничке заранее готовят файл-метку <code class="file">targets.mind</code>.</p>
+    <div class="callout tip" style="margin-bottom:0">
+      Без <code class="file">targets.mind</code> тоже работает — телефон создаст метку сам при
+      первом открытии (15–40 секунд ожидания). С готовым файлом открывается сразу.
+    </div>
+  </div>
+
+  <h2>Шаг 1. Выберите фотографию</h2>
+  <div class="drop" id="drop">
+    <div class="big">🖼️</div>
+    <div><b>Перетащите сюда фото</b> или нажмите, чтобы выбрать файл</div>
+    <div class="muted">JPG или PNG</div>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+
+  <div id="work" style="display:none">
+    <h2>Шаг 2. Подгоняем под лист A4</h2>
+    <div class="card">
+      <div class="row">
+        <div class="preview"><div class="sheet" id="sheet"></div>
+          <div class="muted" id="sizeInfo" style="text-align:center;margin-top:8px"></div>
+        </div>
+        <div class="opts">
+          <label class="opt">Ориентация листа:
+            <select id="orient">
+              <option value="auto">авто (по фотографии)</option>
+              <option value="portrait">вертикально (210×297 мм)</option>
+              <option value="landscape">горизонтально (297×210 мм)</option>
+            </select>
+          </label>
+          <label class="opt">Как вписать фото:
+            <select id="mode">
+              <option value="cover">заполнить лист (лишнее обрезается)</option>
+              <option value="contain">целиком, с белыми полями</option>
+            </select>
+          </label>
+          <div class="callout warn" id="ratioWarn" style="display:none"></div>
+          <button id="dlPhoto">⬇️ Скачать photo.jpg (A4)</button>
+          <button id="printBtn" class="ghost">🖨️ Печать листа</button>
+        </div>
+      </div>
+      <div class="callout tip">
+        Печатайте <b>без полей / масштаб 100 %</b> на матовой бумаге — блики от глянца мешают
+        камере узнавать фото.
+      </div>
+    </div>
+
+    <h2>Шаг 3. Создайте метку targets.mind</h2>
+    <div class="card">
+      <p style="margin-top:0">Метка строится из того же листа A4, который вы распечатаете.
+         Займёт от 10 секунд до минуты.</p>
+      <button id="compileBtn">⚙️ Создать targets.mind</button>
+      <div class="bar" id="bar"><i></i></div>
+      <div id="status" class="muted"></div>
+      <div class="callout ok" id="done" style="display:none">
+        Готово! Положите <code class="file">photo.jpg</code> и <code class="file">targets.mind</code>
+        в папку карточки (например <b>card1</b>) рядом с <code class="file">video.mp4</code>.
+      </div>
+    </div>
+
+    <h2>Что получится в папке карточки</h2>
+    <div class="card">
+      <ol style="margin:0">
+        <li><code class="file">index.html</code> — уже лежит, менять не нужно</li>
+        <li><code class="file">photo.jpg</code> — лист A4, который вы распечатали</li>
+        <li><code class="file">video.mp4</code> — ваше видео (до 25 МБ)</li>
+        <li><code class="file">targets.mind</code> — метка из этого шага</li>
+      </ol>
+    </div>
+
+    <h2>Как проверить</h2>
+    <div class="card">
+      <p style="margin:0">Откройте карточку на телефоне по адресу <b>https://…</b> (GitHub Pages),
+         разрешите камеру и наведите её на распечатанный лист. Видео ляжет ровно на фотографию
+         и будет поворачиваться вместе с телефоном.</p>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { Compiler } from 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js';
+
+const A4_LONG = 2339, A4_SHORT = 1654;   // 200 точек на дюйм — хватает для печати
+
+const drop = document.getElementById('drop');
+const file = document.getElementById('file');
+const work = document.getElementById('work');
+const sheetEl = document.getElementById('sheet');
+const orientSel = document.getElementById('orient');
+const modeSel = document.getElementById('mode');
+const ratioWarn = document.getElementById('ratioWarn');
+const sizeInfo = document.getElementById('sizeInfo');
+const bar = document.getElementById('bar');
+const barI = bar.querySelector('i');
+const status = document.getElementById('status');
+const done = document.getElementById('done');
+
+let srcImg = null;
+let canvas = null;
+
+drop.addEventListener('click', () => file.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]);
+});
+file.addEventListener('change', () => { if (file.files[0]) load(file.files[0]); });
+orientSel.addEventListener('change', render);
+modeSel.addEventListener('change', render);
+
+function load(f) {
+  const img = new Image();
+  img.onload = () => { srcImg = img; work.style.display = ''; render(); work.scrollIntoView({behavior:'smooth'}); };
+  img.onerror = () => alert('Не получилось открыть этот файл. Нужен JPG или PNG.');
+  img.src = URL.createObjectURL(f);
+}
+
+function render() {
+  const portrait = orientSel.value === 'portrait' ? true
+                 : orientSel.value === 'landscape' ? false
+                 : srcImg.naturalHeight >= srcImg.naturalWidth;
+
+  const W = portrait ? A4_SHORT : A4_LONG;
+  const H = portrait ? A4_LONG  : A4_SHORT;
+
+  canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+
+  const sw = srcImg.naturalWidth, sh = srcImg.naturalHeight;
+  const scale = modeSel.value === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh);
+  const dw = sw * scale, dh = sh * scale;
+  ctx.drawImage(srcImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+
+  sheetEl.classList.toggle('land', !portrait);
+  sheetEl.style.backgroundImage = `url(${canvas.toDataURL('image/jpeg', 0.7)})`;
+  sizeInfo.textContent = portrait ? 'A4 вертикально' : 'A4 горизонтально';
+
+  const lost = modeSel.value === 'cover'
+    ? Math.round(100 - (Math.min(W / dw, H / dh) * 100))
+    : 0;
+  if (modeSel.value === 'cover' && lost >= 18) {
+    ratioWarn.style.display = '';
+    ratioWarn.innerHTML = `Пропорции фото сильно отличаются от A4: обрежется около <b>${lost}%</b>
+      кадра. Можно выбрать вариант «целиком, с белыми полями».`;
+  } else { ratioWarn.style.display = 'none'; }
+
+  done.style.display = 'none';
+  status.textContent = '';
+}
+
+document.getElementById('dlPhoto').addEventListener('click', () => {
+  canvas.toBlob(b => save(b, 'photo.jpg'), 'image/jpeg', 0.92);
+});
+
+document.getElementById('printBtn').addEventListener('click', () => {
+  const url = canvas.toDataURL('image/jpeg', 0.92);
+  const portrait = canvas.height > canvas.width;
+  const w = window.open('', '_blank');
+  w.document.write(`<!doctype html><title>Печать A4</title>
+    <style>@page{size:A4 ${portrait ? 'portrait' : 'landscape'};margin:0}
+    html,body{margin:0;padding:0}img{width:100%;height:100vh;object-fit:contain;display:block}</style>
+    <img src="${url}" onload="window.print()">`);
+  w.document.close();
+});
+
+document.getElementById('compileBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true; bar.style.display = 'block'; done.style.display = 'none';
+  status.textContent = 'Изучаем фотографию…';
+  try {
+    // уменьшенная копия листа — так быстрее, качество распознавания то же
+    const maxW = 1200;
+    const small = document.createElement('canvas');
+    const k = Math.min(1, maxW / canvas.width);
+    small.width = Math.round(canvas.width * k);
+    small.height = Math.round(canvas.height * k);
+    small.getContext('2d').drawImage(canvas, 0, 0, small.width, small.height);
+
+    const compiler = new Compiler();
+    await compiler.compileImageTargets([small], p => { barI.style.width = p + '%'; });
+    const buffer = await compiler.exportData();
+    save(new Blob([buffer]), 'targets.mind');
+    status.textContent = 'Файл targets.mind скачан (' + Math.round(buffer.byteLength / 1024) + ' КБ).';
+    done.style.display = '';
+  } catch (err) {
+    console.error(err);
+    status.textContent = 'Не получилось создать метку. Попробуйте другой браузер (Chrome) или фото поменьше.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function save(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+</script>
+</body>
+</html>
